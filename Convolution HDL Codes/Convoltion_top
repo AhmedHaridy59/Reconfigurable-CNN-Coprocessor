@@ -1,0 +1,448 @@
+
+//////////////////////////////////////////////////////////////////////////////////
+// Company:  IC-Pedia
+// Engineer: Ahmed Haridy
+// 
+// Create Date: 09/04/2021 12:40:19 AM
+// Design Name: 
+// Module Name: Convolution_Controller_Top
+// Project Name: 
+// Target Devices: 
+// Tool Versions: 
+// Description: 
+// 
+// Dependencies: 
+// 
+// Revision:
+// Revision 0.01 - File Created
+// Additional Comments:
+// 
+//////////////////////////////////////////////////////////////////////////////////
+
+
+module Convolution_Top(
+input clk, reset, // Clock and Active High Asynchronous reset
+
+// Inputs of Reconfigurable Controller
+input  Local_Reset, 
+input conv_en, // Convolution Start
+input [2:0] F, // Filter Size 1~8
+input [7:0] N, // Feature Input Size 1~256
+
+// Inputs of Src Matrix RAM to Input Feature Buffer
+input [15:0] Rd_data0_IF,
+input [15:0] Rd_data1_IF,
+input [15:0] Rd_data2_IF,
+input [15:0] Rd_data3_IF,
+input [15:0] Rd_data4_IF,
+input [15:0] Rd_data5_IF,
+input [15:0] Rd_data6_IF,
+input [15:0] Rd_data7_IF,
+
+// Inputs of Parameter Matrix RAM to Kernal Weights Buffer
+input [15:0] Rd_data0_KW,
+input [15:0] Rd_data1_KW,
+input [15:0] Rd_data2_KW,
+input [15:0] Rd_data3_KW,
+input [15:0] Rd_data4_KW,
+input [15:0] Rd_data5_KW,
+input [15:0] Rd_data6_KW,
+input [15:0] Rd_data7_KW,
+
+// Output
+output [31:0] Convolution_Product,
+
+// Feedback Signals To Reconfigurable Controller
+output Finish,
+output Overflow_Conv
+    );
+ /////////////////////  Controller intermediate Variables ////////////////////
+ 
+ // CTRL_CCT_IF_Load outputs //  // Addresses of IF_Load_ROMs & IF_IPSelect_ROMs //
+ wire [22:0] IF_Address1;
+ wire [22:0] IF_Address2;
+ wire [22:0] IF_Address3;
+ wire [22:0] IF_Address4;
+ wire [22:0] IF_Address5;
+ wire [22:0] IF_Address6;
+ wire [22:0] IF_Address7;
+ wire [22:0] IF_Address8;
+ 
+ // CTRL_CCT_KW_OPSelect outputs // // Addresses of KW_OPSelect_ROMs // 
+ wire [22:0] KW_Address1; 
+ wire [22:0] KW_Address2;
+ wire [22:0] KW_Address3;
+ wire [22:0] KW_Address4;
+ wire [22:0] KW_Address5;
+ wire [22:0] KW_Address6;
+ wire [22:0] KW_Address7;
+ wire [22:0] KW_Address8;
+ 
+ wire [6:0] KW_Load_Add;
+ 
+ //// ROMs Outputs Before MUXs ////
+
+wire [63:0] ROM1_IFLoad_Out;
+wire [63:0] ROM2_IFLoad_Out;
+wire [63:0] ROM3_IFLoad_Out;
+wire [63:0] ROM4_IFLoad_Out;
+wire [63:0] ROM5_IFLoad_Out;
+wire [63:0] ROM6_IFLoad_Out;
+wire [63:0] ROM7_IFLoad_Out;
+wire [63:0] ROM8_IFLoad_Out;
+
+wire [191:0] ROM1_IFSelect_Out;
+wire [191:0] ROM2_IFSelect_Out;
+wire [191:0] ROM3_IFSelect_Out;
+wire [191:0] ROM4_IFSelect_Out;
+wire [191:0] ROM5_IFSelect_Out;
+wire [191:0] ROM6_IFSelect_Out;
+wire [191:0] ROM7_IFSelect_Out;
+wire [191:0] ROM8_IFSelect_Out;
+
+wire [383:0] ROM1_KWSelect_Out;
+wire [383:0] ROM2_KWSelect_Out;
+wire [383:0] ROM3_KWSelect_Out;
+wire [383:0] ROM4_KWSelect_Out;
+wire [383:0] ROM5_KWSelect_Out;
+wire [383:0] ROM6_KWSelect_Out;
+wire [383:0] ROM7_KWSelect_Out;
+wire [383:0] ROM8_KWSelect_Out;
+ 
+//// Final Control Signals (after MUXs) ////
+wire [63:0] IF_Load_Signals; 
+wire [63:0] KW_Load_Signals;
+
+wire [191:0] IF_IPSelect_Signals;
+wire [191:0] KW_IPSelect_Signals;
+
+wire [383:0] KW_OPSelect_Signals;
+
+// Local Reset and Multiply Enable //
+wire [63:0] Multipliers_Enable;
+wire [63:0] Multipliers_Enable_i; // Local Reset for IF_MAP_BUFFER
+
+// Internal Finish as Finish is controlled by Load Sub circuit Only 
+wire Int_Finish,Int_Finish1; 
+
+// we have 8 Control sub circuits for Load ROMs, so determine Finish according to F
+wire Finish_1, Finish_2, Finish_3, Finish_4, Finish_5, Finish_6, Finish_7, Finish_8;
+wire Finish_11,Finish_12,Finish_13,Finish_14,Finish_15,Finish_16,Finish_17,Finish_18; 
+
+// Control Sub-Circuits of IF-MAP-Buffer Loads
+ // Circuit #1
+ CTRL_CCT_IF_Load1 CIFL1 (
+ .clk(clk),
+ .reset(reset),
+ .Counter_rst(Local_Reset),
+ .conv_enable(conv_en),
+ .N(N),
+ .ROM_Address(IF_Address1),
+ .Finish(Finish_1));
+ 
+ // Circuit #2
+ CTRL_CCT_IF_Load2 CIFL2 (
+ .clk(clk),
+ .reset(reset),
+ .Counter_rst(Local_Reset),
+ .conv_enable(conv_en),
+ .N(N),
+ .ROM_Address(IF_Address2),
+ .Finish(Finish_2));
+ 
+  // Circuit #3
+ CTRL_CCT_IF_Load3 CIFL3 (
+ .clk(clk),
+ .reset(reset),
+ .Counter_rst(Local_Reset),
+ .conv_enable(conv_en),
+ .N(N),
+ .ROM_Address(IF_Address3),
+ .Finish(Finish_3));
+  // Circuit #1
+ CTRL_CCT_IF_Load4 CIFL4 (
+ .clk(clk),
+ .reset(reset),
+ .Counter_rst(Local_Reset),
+ .conv_enable(conv_en),
+ .N(N),
+ .ROM_Address(IF_Address4),
+ .Finish(Finish_4));
+ 
+  // Circuit #5
+ CTRL_CCT_IF_Load5 CIFL5 (
+ .clk(clk),
+ .reset(reset),
+ .Counter_rst(Local_Reset),
+ .conv_enable(conv_en),
+ .N(N),
+ .ROM_Address(IF_Address5),
+ .Finish(Finish_5));
+  
+ // Circuit #6
+ CTRL_CCT_IF_Load6 CIFL6 (
+ .clk(clk),
+ .reset(reset),
+ .Counter_rst(Local_Reset),
+ .conv_enable(conv_en),
+ .N(N),
+ .ROM_Address(IF_Address6),
+ .Finish(Finish_6));
+ 
+  // Circuit #7
+ CTRL_CCT_IF_Load7 CIFL7 (
+ .clk(clk),
+ .reset(reset),
+ .Counter_rst(Local_Reset),
+ .conv_enable(conv_en),
+ .N(N),
+ .ROM_Address(IF_Address7),
+ .Finish(Finish_7));
+ 
+  // Circuit #8
+ CTRL_CCT_IF_Load8 CIFL8 (
+ .clk(clk),
+ .reset(reset),
+ .Counter_rst(Local_Reset),
+ .conv_enable(conv_en),
+ .N(N),
+ .ROM_Address(IF_Address8),
+ .Finish(Finish_8));
+ 
+ // ROMs of IF Load and IPSelect Control Signals //
+IF_Load_ROM1  IFLR1(.addr_i(IF_Address1), .ROM1_IFLoad_Out(ROM1_IFLoad_Out));
+IF_Load_ROM2  IFLR2(.addr_i(IF_Address2), .ROM2_IFLoad_Out(ROM2_IFLoad_Out));
+IF_Load_ROM3  IFLR3(.addr_i(IF_Address3), .ROM3_IFLoad_Out(ROM3_IFLoad_Out));
+IF_Load_ROM4  IFLR4(.addr_i(IF_Address4), .ROM4_IFLoad_Out(ROM4_IFLoad_Out));
+IF_Load_ROM5  IFLR5(.addr_i(IF_Address5), .ROM5_IFLoad_Out(ROM5_IFLoad_Out));
+IF_Load_ROM6  IFLR6(.addr_i(IF_Address6), .ROM6_IFLoad_Out(ROM6_IFLoad_Out));
+IF_Load_ROM7  IFLR7(.addr_i(IF_Address7), .ROM7_IFLoad_Out(ROM7_IFLoad_Out));
+IF_Load_ROM8  IFLR8(.addr_i(IF_Address8), .ROM8_IFLoad_Out(ROM8_IFLoad_Out));
+
+IF_IPSelect_ROM1 IFSR1 (.addr_i(IF_Address1), .ROM1_IFSelect_Out(ROM1_IFSelect_Out));
+IF_IPSelect_ROM2 IFSR2 (.addr_i(IF_Address2), .ROM2_IFSelect_Out(ROM2_IFSelect_Out));
+IF_IPSelect_ROM3 IFSR3 (.addr_i(IF_Address3), .ROM3_IFSelect_Out(ROM3_IFSelect_Out));
+IF_IPSelect_ROM4 IFSR4 (.addr_i(IF_Address4), .ROM4_IFSelect_Out(ROM4_IFSelect_Out));
+IF_IPSelect_ROM5 IFSR5 (.addr_i(IF_Address5), .ROM5_IFSelect_Out(ROM5_IFSelect_Out));
+IF_IPSelect_ROM6 IFSR6 (.addr_i(IF_Address6), .ROM6_IFSelect_Out(ROM6_IFSelect_Out));
+IF_IPSelect_ROM7 IFSR7 (.addr_i(IF_Address7), .ROM7_IFSelect_Out(ROM7_IFSelect_Out));
+IF_IPSelect_ROM8 IFSR8 (.addr_i(IF_Address8), .ROM8_IFSelect_Out(ROM8_IFSelect_Out));
+
+// Control Sub-Circuit Of Load KW_MAP_BUFFER
+// Circuit # 1
+CTRL_CCT_KW_OPSelect1 CKWOP1(
+.clk(clk), 
+.reset(reset),
+.Counter_rst(Local_Reset),
+.conv_enable(conv_en),
+.N(N), 
+.ROM_Address(KW_Address1),
+.Finish
+(Finish_11));
+
+// Circuit # 2
+CTRL_CCT_KW_OPSelect2 CKWOP2(
+.clk(clk), 
+.reset(reset),
+.Counter_rst(Local_Reset),
+.conv_enable(conv_en),
+.N(N), 
+.ROM_Address(KW_Address2),
+.Finish(Finish_12));
+
+// Circuit # 3
+CTRL_CCT_KW_OPSelect3 CKWOP3(
+.clk(clk), 
+.reset(reset),
+.Counter_rst(Local_Reset),
+.conv_enable(conv_en),
+.N(N), 
+.ROM_Address(KW_Address3),
+.Finish(Finish_13));
+
+// Circuit # 4
+CTRL_CCT_KW_OPSelect4 CKWOP4(
+.clk(clk), 
+.reset(reset),
+.Counter_rst(Local_Reset),
+.conv_enable(conv_en),
+.N(N), 
+.ROM_Address(KW_Address4),
+.Finish(Finish_14));
+
+// Circuit # 5
+CTRL_CCT_KW_OPSelect5 CKWOP5(
+.clk(clk), 
+.reset(reset),
+.Counter_rst(Local_Reset),
+.conv_enable(conv_en),
+.N(N), 
+.ROM_Address(KW_Address5),
+.Finish(Finish_15));
+
+// Circuit # 6
+CTRL_CCT_KW_OPSelect6 CKWOP6(
+.clk(clk), 
+.reset(reset),
+.Counter_rst(Local_Reset),
+.conv_enable(conv_en),
+.N(N), 
+.ROM_Address(KW_Address6),
+.Finish(Finish_16));
+
+// Circuit # 7
+CTRL_CCT_KW_OPSelect7 CKWOP7(
+.clk(clk), 
+.reset(reset),
+.Counter_rst(Local_Reset),
+.conv_enable(conv_en),
+.N(N), 
+.ROM_Address(KW_Address7),
+.Finish(Finish_17));
+
+// Circuit # 8
+CTRL_CCT_KW_OPSelect8 CKWOP8(
+.clk(clk), 
+.reset(reset),
+.Counter_rst(Local_Reset),
+.conv_enable(conv_en),
+.N(N), 
+.ROM_Address(KW_Address8),
+.Finish(Finish_18));
+
+ // ROMs of KW OPSelect Control Signals //
+KW_OPSelect_ROM1 KWOPR1 (.addr_i(KW_Address1), .ROM1_KWSelect_Out(ROM1_KWSelect_Out));
+KW_OPSelect_ROM2 KWOPR2 (.addr_i(KW_Address2), .ROM2_KWSelect_Out(ROM2_KWSelect_Out));
+KW_OPSelect_ROM3 KWOPR3 (.addr_i(KW_Address3), .ROM3_KWSelect_Out(ROM3_KWSelect_Out));
+KW_OPSelect_ROM4 KWOPR4 (.addr_i(KW_Address4), .ROM4_KWSelect_Out(ROM4_KWSelect_Out));
+KW_OPSelect_ROM5 KWOPR5 (.addr_i(KW_Address5), .ROM5_KWSelect_Out(ROM5_KWSelect_Out));
+KW_OPSelect_ROM6 KWOPR6 (.addr_i(KW_Address6), .ROM6_KWSelect_Out(ROM6_KWSelect_Out));
+KW_OPSelect_ROM7 KWOPR7 (.addr_i(KW_Address7), .ROM7_KWSelect_Out(ROM7_KWSelect_Out));
+KW_OPSelect_ROM8 KWOPR8 (.addr_i(KW_Address8), .ROM8_KWSelect_Out(ROM8_KWSelect_Out));
+
+// Control sub-Circuit Of Load KW_MAP_BUFFER
+ CTRL_CCT_KW_Load CKWL1(
+.clk(clk), 
+.reset(reset), 
+.Counter_rst(Local_Reset),
+.conv_enable(conv_en),
+.F(F),
+.ROM_Address (KW_Load_Add));
+
+// ROM Of Load KW_MAP_BUFFER
+KW_Load_ROM KWLR1 (.addr_i(KW_Load_Add),.mem(KW_Load_Signals));
+
+// ROM of IP Select KW_MAP_BUFFER
+ KW_IPSelect_ROM KWIPR1(.addr_i(KW_Load_Add),.mem(KW_IPSelect_Signals)); 
+ 
+ // MUL Enable Circuit
+ MUL_EN_CCT MEC( .F(F) ,.Local_Reset(Local_Reset) ,.Mul_en(Multipliers_Enable));
+ 
+assign Multipliers_Enable_i = ~Multipliers_Enable;
+
+/////// Get Final Control Signals Out of MUXs /////
+
+// IF Load Signals
+Out_MUX_IF_Load MUXIFL1(
+.F(F),
+.ROM1_out(ROM1_IFLoad_Out),
+.ROM2_out(ROM2_IFLoad_Out),
+.ROM3_out(ROM3_IFLoad_Out),
+.ROM4_out(ROM4_IFLoad_Out),
+.ROM5_out(ROM5_IFLoad_Out),
+.ROM6_out(ROM6_IFLoad_Out),
+.ROM7_out(ROM7_IFLoad_Out),
+.ROM8_out(ROM8_IFLoad_Out),
+.ROM_IFLoad_Out(IF_Load_Signals)
+);
+
+// IF IP Select Signals
+Out_MUX_IF_Select MUXIFS1(
+.F(F),
+.ROM1_out(ROM1_IFSelect_Out),
+.ROM2_out(ROM2_IFSelect_Out),
+.ROM3_out(ROM3_IFSelect_Out),
+.ROM4_out(ROM4_IFSelect_Out),
+.ROM5_out(ROM5_IFSelect_Out),
+.ROM6_out(ROM6_IFSelect_Out),
+.ROM7_out(ROM7_IFSelect_Out),
+.ROM8_out(ROM8_IFSelect_Out),
+.ROM_IFSelect_Out(IF_IPSelect_Signals));
+
+// KW OP Select Signals
+Out_MUX_KW_Select MUXKWS1(
+.F(F),
+.ROM1_out(ROM1_KWSelect_Out),
+.ROM2_out(ROM1_KWSelect_Out),
+.ROM3_out(ROM1_KWSelect_Out),
+.ROM4_out(ROM1_KWSelect_Out),
+.ROM5_out(ROM1_KWSelect_Out),
+.ROM6_out(ROM1_KWSelect_Out),
+.ROM7_out(ROM1_KWSelect_Out),
+.ROM8_out(ROM1_KWSelect_Out),
+.ROM_KWSelect_Out
+(KW_OPSelect_Signals));
+
+// Finish
+Finish_MUX(
+.Finish_1(Finish_1),
+.Finish_2(Finish_2),
+.Finish_3(Finish_3),
+.Finish_4(Finish_4),
+.Finish_5(Finish_5),
+.Finish_6(Finish_6),
+.Finish_7(Finish_7),
+.Finish_8(Finish_8),
+.F(F),
+.Finish(Finish));
+
+//////////////// Convolution Datapath //////////////////////
+wire [64*16-1:0] Multiplier_IN1;
+wire [64*16-1:0] Multiplier_IN2;
+
+//IF MAP Buffer
+IF_Map_BUF IFMAPBUF(
+.clk(clk),
+.reset(reset),
+.Rd_data0(Rd_data0_IF),
+.Rd_data1(Rd_data1_IF),
+.Rd_data2(Rd_data2_IF),
+.Rd_data3(Rd_data3_IF),
+.Rd_data4(Rd_data4_IF),
+.Rd_data5(Rd_data5_IF),
+.Rd_data6(Rd_data6_IF),
+.Rd_data7(Rd_data7_IF),
+.Reg_loads(IF_Load_Signals),
+.Mux_Sel(IF_IPSelect_Signals),
+.Local_Reset(Multipliers_Enable_i), 
+.MAC_IN1(Multiplier_IN1)
+);
+
+// KW MAP Buffer
+KW_Map_BUF KWMAPBUF(
+.clk(clk),
+.reset(reset),
+.Rd_data0(Rd_data0_KW),
+.Rd_data1(Rd_data1_KW),
+.Rd_data2(Rd_data2_KW),
+.Rd_data3(Rd_data3_KW),
+.Rd_data4(Rd_data4_KW),
+.Rd_data5(Rd_data5_KW),
+.Rd_data6(Rd_data6_KW),
+.Rd_data7(Rd_data7_KW),
+.Reg_loads(KW_Load_Signals),
+.Mux_Sel(KW_IPSelect_Signals) ,
+.Out_Mux_Sel(KW_OPSelect_Signals),
+.Local_Reset(Multipliers_Enable_i), 
+.MAC_IN2(Multiplier_IN2)
+);
+
+// MAC (Multiply and Accumulative)
+ mac myMAC(
+.clock(clk), .reset(reset),.local_reset(Local_Reset),.load(1'b1),
+.MUL_EN(Multipliers_Enable), 
+.IF_map_Out_mac(Multiplier_IN1),
+.KW_map_Out_mac(Multiplier_IN2),
+.out_of_mac(Convolution_Product)
+.Overflow(Overflow_Conv));
+endmodule
