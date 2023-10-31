@@ -1,0 +1,288 @@
+
+//////////////////////////////////////////////////////////////////////////////////
+// Company:  IC-Pedia
+// Engineer: Ahmed Haridy
+// 
+// Create Date: 05/16/2021 09:03:30 PM
+// Design Name: 
+// Module Name: Memory_File_Top
+// Project Name: 
+// Target Devices: 
+// Tool Versions: 
+// Description: 
+/*  
+
+Here to Collect all Modules into one Top Module as RAM 0,1 and 2 are working as Src A, Src C and Result RAMs with memory interleaving,
+but RAM 3 is fixed as Src B RAM always   
+
+*/
+// Dependencies: 
+// 
+// Revision:
+// Revision 0.01 - File Created
+// Additional Comments:
+// 
+//////////////////////////////////////////////////////////////////////////////////
+
+
+module Memory_File_Top#(parameter No_bits =16)(
+
+// Common Inputs
+input clock,
+input reset,
+
+// Controller inputs 
+
+input Local_reset0_RAM, Local_reset1_RAM, Local_reset2_RAM, Local_reset3_RAM,
+input Local_reset0_Arbiter, Local_reset1_Arbiter, Local_reset2_Arbiter, Local_reset3_Arbiter,
+
+input [2:0] Opcode0, Opcode1, Opcode2, 
+input       Opcode3, 
+
+input Op1_Enable0, Op1_Enable1, Op1_Enable2, Op1_Enable3,  //Enable to start Op1
+input Op2_Enable0, Op2_Enable1, Op2_Enable2, Op2_Enable3,  //Enable to start Op2
+input Op3_Enable0, Op3_Enable1, Op3_Enable2,               //Enable to start Op3
+input Op4_Enable0, Op4_Enable1, Op4_Enable2,               //Enable to start Op4
+input Op5_Enable0, Op5_Enable1, Op5_Enable2,               //Enable to start Op5
+
+input Op1_Count_En0, Op1_Count_En1, Op1_Count_En2,         // Count Enable For Op1
+input Op2_Count_En0, Op2_Count_En1, Op2_Count_En2,         // Count Enable For Op2
+input Op3_Count_En0, Op3_Count_En1, Op3_Count_En2,         // Count Enable For Op3
+input Op5_Count_En0, Op5_Count_En1, Op5_Count_En2,         // Count Enable For Op5
+
+input [7:0] N0, N1, N2,
+input [2:0] F0, F1, F2, F3,
+
+// Control Signals of MUXs
+input [1:0] RAM_IN_SEL0, RAM_IN_SEL1, RAM_IN_SEL2,
+input [1:0] SrcA_IN_SEL,
+input [1:0] SrcC_IN_SEL,
+input [1:0] BUS_OUT_SEL,
+
+// Input Data Buses
+input [31:0] Bus_In,
+input [31:0] PE_Result,
+
+// Output Data Buses
+output [31:0] Bus_Out,
+
+output [No_bits*8-1:0] PE_SrcA,  // 8 buses x 16 bits
+output [No_bits*8-1:0] PE_SrcB,  // 8 buses x 16 bits
+output [No_bits-1:0]     PE_SrcC,  // 1 buses x 16 bits
+
+// Feedback Signals   // Operation of RAM has been finished // 
+
+output Finish0, Finish1, Finish2, Finish3
+    );
+    
+// inputs of RAMs and outputs of RAM_IN_MUXs
+wire [No_bits-1:0] Data_in0, Data_in1, Data_in2;
+    
+// outputs of RAMs concatenated
+wire [No_bits*8-1:0] Data_Out0_A, Data_Out1_A, Data_Out2_A;
+wire [No_bits*8-1:0] Data_Out0_B;
+wire [No_bits-1:0]     Data_Out0_C, Data_Out1_C, Data_Out2_C;
+
+// outputs of RAMs as Data_Out02 for RAM0 and out_bus2 and so on
+// RAM 0, 1 & 2 Output
+wire [No_bits-1:0] Data_Out00, Data_Out01, Data_Out02, Data_Out03, Data_Out04, Data_Out05, Data_Out06, Data_Out07;
+wire [No_bits-1:0] Data_Out10, Data_Out11, Data_Out12, Data_Out13, Data_Out14, Data_Out15, Data_Out16, Data_Out17;
+wire [No_bits-1:0] Data_Out20, Data_Out21, Data_Out22, Data_Out23, Data_Out24, Data_Out25, Data_Out26, Data_Out27;
+// RAM 3 (B) Output
+wire [No_bits-1:0] Data_Out30, Data_Out31, Data_Out32, Data_Out33, Data_Out34, Data_Out35, Data_Out36, Data_Out37;
+
+///////////////////////// RAMs and their Arbiters ////////////////////////////
+
+    // RAM0
+    RAM_with_Arbiter RAM0(
+    .clock(clock),
+    .reset(reset),
+    .Local_reset_RAM(Local_reset0_RAM),
+    .Local_reset_Arbiter(Local_reset0_Arbiter),
+    .Opcode(Opcode0),
+    .Op1_Enable(Op1_Enable0),
+    .Op2_Enable(Op2_Enable0),
+    .Op3_Enable(Op3_Enable0),
+    .Op4_Enable(Op4_Enable0),
+    .Op5_Enable(Op5_Enable0),
+    .Count_En1(Op1_Count_En0),
+    .Count_En2(Op2_Count_En0),
+    .Count_En3(Op3_Count_En0),
+    .Count_En5(Op5_Count_En0),
+    .N(N0),
+    .F(F0),
+    .Data_in(Data_in0), 
+    .Data_out_0(Data_Out00),
+    .Data_out_1(Data_Out01),
+    .Data_out_2(Data_Out02),
+    .Data_out_3(Data_Out03),
+    .Data_out_4(Data_Out04),
+    .Data_out_5(Data_Out05),
+    .Data_out_6(Data_Out06),
+    .Data_out_7(Data_Out07),                 
+    .Finish(Finish0)
+        );
+
+    // RAM1
+    RAM_with_Arbiter RAM1(
+    .clock(clock),
+    .reset(reset),
+    .Local_reset_RAM(Local_reset1_RAM),
+    .Local_reset_Arbiter(Local_reset1_Arbiter),
+    .Opcode(Opcode1),
+    .Op1_Enable(Op1_Enable1),
+    .Op2_Enable(Op2_Enable1),
+    .Op3_Enable(Op3_Enable1),
+    .Op4_Enable(Op4_Enable1),
+    .Op5_Enable(Op5_Enable1),
+    .Count_En1(Op1_Count_En1),
+    .Count_En2(Op2_Count_En1),
+    .Count_En3(Op3_Count_En1),
+    .Count_En5(Op5_Count_En1),
+    .N(N1),
+    .F(F1),
+    .Data_in(Data_in1), 
+    .Data_out_0(Data_Out10),
+    .Data_out_1(Data_Out11),
+    .Data_out_2(Data_Out12),
+    .Data_out_3(Data_Out13),
+    .Data_out_4(Data_Out14),
+    .Data_out_5(Data_Out15),
+    .Data_out_6(Data_Out16),
+    .Data_out_7(Data_Out17),                 
+    .Finish(Finish1)
+        );
+        
+        
+        // RAM2
+    RAM_with_Arbiter RAM2(
+    .clock(clock),
+    .reset(reset),
+    .Local_reset_RAM(Local_reset2_RAM),
+    .Local_reset_Arbiter(Local_reset2_Arbiter),
+    .Opcode(Opcode2),
+    .Op1_Enable(Op1_Enable2),
+    .Op2_Enable(Op2_Enable2),
+    .Op3_Enable(Op3_Enable2),
+    .Op4_Enable(Op4_Enable2),
+    .Op5_Enable(Op5_Enable2),
+    .Count_En1(Op1_Count_En2),
+    .Count_En2(Op2_Count_En2),
+    .Count_En3(Op3_Count_En2),
+    .Count_En5(Op5_Count_En2),
+    .N(N2),
+    .F(F2),
+    .Data_in(Data_in2), 
+    .Data_out_0(Data_Out20),
+    .Data_out_1(Data_Out21),
+    .Data_out_2(Data_Out22),
+    .Data_out_3(Data_Out23),
+    .Data_out_4(Data_Out24),
+    .Data_out_5(Data_Out25),
+    .Data_out_6(Data_Out26),
+    .Data_out_7(Data_Out27),                 
+    .Finish(Finish2)
+        );
+
+    // RAM3(B)
+    RAM_with_Arbiter_B RAM3(
+    .clock(clock),
+    .reset(reset),
+    .Local_reset_RAM(Local_reset3_RAM),
+    .Local_reset_Arbiter(Local_reset3_Arbiter),
+    .Opcode(Opcode3),
+    .Op1_Enable(Op1_Enable3),
+    .Op2_Enable(Op2_Enable3),
+    .F(F3),
+    .Data_in(Bus_In[15:0]), 
+    .Data_out_0(Data_Out30),
+    .Data_out_1(Data_Out31),
+    .Data_out_2(Data_Out32),
+    .Data_out_3(Data_Out33),
+    .Data_out_4(Data_Out34),
+    .Data_out_5(Data_Out35),
+    .Data_out_6(Data_Out36),
+    .Data_out_7(Data_Out37),                 
+    .Finish(Finish3)
+        );    
+// Taking 16 LSBs of Data outs of RAM as they express the data only and other bits are sign or zero extension 
+    assign Data_Out0_A = {Data_Out07[No_bits-1:0], Data_Out06[No_bits-1:0], Data_Out05[No_bits-1:0], Data_Out04[No_bits-1:0], Data_Out03[No_bits-1:0], Data_Out02[No_bits-1:0], Data_Out01[No_bits-1:0], Data_Out00[No_bits-1:0]};
+    assign Data_Out1_A = {Data_Out17[No_bits-1:0], Data_Out16[No_bits-1:0], Data_Out15[No_bits-1:0], Data_Out14[No_bits-1:0], Data_Out13[No_bits-1:0], Data_Out12[No_bits-1:0], Data_Out11[No_bits-1:0], Data_Out10[No_bits-1:0]};
+    assign Data_Out2_A = {Data_Out27[No_bits-1:0], Data_Out26[No_bits-1:0], Data_Out25[No_bits-1:0], Data_Out24[No_bits-1:0], Data_Out23[No_bits-1:0], Data_Out22[No_bits-1:0], Data_Out21[No_bits-1:0], Data_Out20[No_bits-1:0]};
+
+// Taking 16 Bus output of Data outs of RAM 3(B)   
+    assign Data_Out0_B = {Data_Out37, Data_Out36, Data_Out35, Data_Out34, Data_Out33, Data_Out32, Data_Out31, Data_Out30};
+
+// Taking Least Significant Bus outs    
+    assign Data_Out0_C = Data_Out00;
+    assign Data_Out1_C = Data_Out10;
+    assign Data_Out2_C = Data_Out20;
+    
+// inputs and outputs MUXs
+
+// Src A input MUX selects between outputs of RAM 0,1 & 2 
+PE_IN_MUX SRCAIN(
+.in0(Data_Out0_A),
+.in1(Data_Out1_A),
+.in2(Data_Out2_A),
+
+.Select(SrcA_IN_SEL),
+
+.out(PE_SrcA)
+    );
+
+// Src B input is just the output of one RAM
+
+assign PE_SrcB = Data_Out0_B;
+// Src C input MUX selects between outputs of RAM 0,1 & 2 
+
+PE_IN_SrcC_MUX SRCCIN(
+.in0(Data_Out0_C),
+.in1(Data_Out1_C),
+.in2(Data_Out2_C),
+.Select(SrcC_IN_SEL),
+.out(PE_SrcC)
+    );
+
+// RAM input MUX selects between other RAMS, PE Result and Bus In
+
+// MUX 0
+RAM_IN_MUX RAMIN0(
+.in0(PE_Result),
+.in1(Data_Out1_C),
+.in2(Data_Out2_C),
+.in3(Bus_In),
+.Select(RAM_IN_SEL0),
+.out(Data_in0)
+    );
+    
+// MUX 1
+RAM_IN_MUX RAMIN1(
+.in0(PE_Result),
+.in1(Data_Out0_C),
+.in2(Data_Out2_C),
+.in3(Bus_In),
+.Select(RAM_IN_SEL1),
+.out(Data_in1)
+    );    
+
+// MUX 2
+RAM_IN_MUX RAMIN2(
+.in0(PE_Result),
+.in1(Data_Out0_C),
+.in2(Data_Out1_C),
+.in3(Bus_In),
+.Select(RAM_IN_SEL2),
+.out(Data_in2)
+    );
+
+// Bus Output MUX Selects between RAMs output
+BUS_OUT_MUX BUSOUT(
+.in0(Data_Out0_C),
+.in1(Data_Out1_C),
+.in2(Data_Out2_C),
+.Select(BUS_OUT_SEL),
+.out(Bus_Out)
+    );
+
+endmodule
